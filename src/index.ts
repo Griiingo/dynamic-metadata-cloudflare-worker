@@ -56,8 +56,8 @@ export default {
 	
 	    const metaDataResponse = await fetch(finalEndpoint, {
 	      headers: {
-	        "apikey": env.SUPABASE_API_KEY,
-	        "Authorization": Bearer ${env.SUPABASE_API_KEY},
+	        "apikey": env.SUPABASE_KEY,
+	        "Authorization": Bearer ${env.SUPABASE_KEY},
 	        "Content-Type": "application/json"
 	      }
     	});
