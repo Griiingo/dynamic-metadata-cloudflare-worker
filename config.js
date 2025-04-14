@@ -1,13 +1,17 @@
 export const config = {
-  domainSource: "https://f69a71f6-9fd8-443b-a040-78beb5d404d4.weweb-preview.io", // Your WeWeb app preview link
+  domainSource: "https://e3c412aa-5c74-4d02-b483-1802d4c8adc9.weweb-preview.io", // Your WeWeb app preview link
   patterns: [
       {
-          pattern: "/event/[^/]+",
-          metaDataEndpoint: "https://xeo6-2sgh-ehgj.n7.xano.io/api:8wD10mRd/event/{id}/meta"
+          pattern: "/empresa/[^/]+",
+          metaDataEndpoint: "https://api.griiingo.com/rest/v1/companies_metadata?slug=eq.{slug}&select=title,description,image,keywords"
       },
       {
-          pattern: "/team/profile/[^/]+",
-          metaDataEndpoint: "https://xeo6-2sgh-ehgj.n7.xano.io/api:LjwxezTv/team/profile/{profile_id}/meta"
+          pattern: "/evento/[^/]+",
+          metaDataEndpoint: "https://api.griiingo.com/rest/v1/events_metadata?slug=eq.{slug}"
+      },
+      {
+          pattern: "/artigo/[^/]+",
+          metaDataEndpoint: "https://api.griiingo.com/rest/v1/articles_metadata?slug=eq.{slug}"
       }
       // Add more patterns and their metadata endpoints as needed
   ]
