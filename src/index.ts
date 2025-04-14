@@ -50,8 +50,20 @@ export default {
           return {};
         }
 
-        const metadata = await metaDataResponse.json();
-        return metadata;
+        const responseJson = await metaDataResponse.json();
+        if (responseJson && responseJson.source && responseJson.source["0"]) {
+          const metadata = responseJson.source["0"];
+
+          // OPTIONAL: Fix image field if needed
+          if (metadata.image && !metadata.image.startsWith('http')) {
+            metadata.image = `https://api.griiingo.com/storage/v1/object/public/public-user-content/companies-photos/${metadata.image}`;
+          }
+
+          return metadata;
+        } else {
+          console.warn("Metadata response was empty or invalid", responseJson);
+          return {};
+        }
       } catch (error) {
         console.error("Error fetching metadata:", error);
         return {};
@@ -77,10 +89,8 @@ export default {
       const metadata = await requestMetadata(url.pathname, patternConfig.metaDataEndpoint, env);
       console.log("Metadata fetched:", metadata);
 
-      // Create a custom header handler with the fetched metadata
       const customHeaderHandler = new CustomHeaderHandler(metadata);
 
-      // Transform the source HTML with the custom headers
       return new HTMLRewriter()
         .on('*', customHeaderHandler)
         .transform(source);
@@ -90,7 +100,6 @@ export default {
       console.log("Page data detected:", url.pathname);
       console.log("Referer:", referer);
 
-      // Fetch the source data content
       const sourceResponse = await fetch(`${domainSource}${url.pathname}`);
       let sourceData = await sourceResponse.json();
 
@@ -102,7 +111,6 @@ export default {
           const metadata = await requestMetadata(pathname, patternConfigForPageData.metaDataEndpoint, env);
           console.log("Metadata fetched:", metadata);
 
-          // Ensure nested objects exist in the source data
           sourceData.page = sourceData.page || {};
           sourceData.page.title = sourceData.page.title || {};
           sourceData.page.meta = sourceData.page.meta || {};
@@ -111,7 +119,6 @@ export default {
           sourceData.page.socialTitle = sourceData.page.socialTitle || {};
           sourceData.page.socialDesc = sourceData.page.socialDesc || {};
 
-          // Update source data with the fetched metadata
           if (metadata.title) {
             sourceData.page.title.en = metadata.title;
             sourceData.page.socialTitle.en = metadata.title;
@@ -128,7 +135,6 @@ export default {
           }
 
           console.log("Returning modified file:", JSON.stringify(sourceData));
-          // Return the modified JSON object
           return new Response(JSON.stringify(sourceData), {
             headers: { 'Content-Type': 'application/json' }
           });
@@ -136,13 +142,12 @@ export default {
       }
     }
 
-    // If the URL does not match any patterns, fetch and return the original content
+    // Fallback: fetch and return original content
     console.log("Fetching original content for:", url.pathname);
     const sourceUrl = new URL(`${domainSource}${url.pathname}`);
     const sourceRequest = new Request(sourceUrl, request);
     const sourceResponse = await fetch(sourceRequest);
 
-    // Create a new response without the "X-Robots-Tag" header
     const modifiedHeaders = new Headers(sourceResponse.headers);
     modifiedHeaders.delete('X-Robots-Tag');
 
@@ -153,74 +158,47 @@ export default {
   }
 };
 
-// CustomHeaderHandler class to modify HTML content based on metadata
+// CustomHeaderHandler class
 class CustomHeaderHandler {
   constructor(metadata) {
     this.metadata = metadata;
   }
 
   element(element) {
-    // Replace the <title> tag content
+    const metadataMap = {
+      "title": this.metadata.title,
+      "description": this.metadata.description,
+      "keywords": this.metadata.keywords,
+      "image": this.metadata.image,
+      "og:title": this.metadata.title,
+      "og:description": this.metadata.description,
+      "og:image": this.metadata.image,
+      "twitter:title": this.metadata.title,
+      "twitter:description": this.metadata.description,
+      "twitter:card": "summary_large_image"
+    };
+
     if (element.tagName == "title") {
       console.log('Replacing title tag content');
-      element.setInnerContent(this.metadata.title);
+      element.setInnerContent(this.metadata.title || '');
     }
-    // Replace meta tags content
+
     if (element.tagName == "meta") {
       const name = element.getAttribute("name");
-      switch (name) {
-        case "title":
-          element.setAttribute("content", this.metadata.title);
-          break;
-        case "description":
-          element.setAttribute("content", this.metadata.description);
-          break;
-        case "image":
-          element.setAttribute("content", this.metadata.image);
-          break;
-        case "keywords":
-          element.setAttribute("content", this.metadata.keywords);
-          break;
-        case "twitter:title":
-          element.setAttribute("content", this.metadata.title);
-          break;
-        case "twitter:description":
-          element.setAttribute("content", this.metadata.description);
-          break;
-      }
-
+      const property = element.getAttribute("property");
       const itemprop = element.getAttribute("itemprop");
-      switch (itemprop) {
-        case "name":
-          element.setAttribute("content", this.metadata.title);
-          break;
-        case "description":
-          element.setAttribute("content", this.metadata.description);
-          break;
-        case "image":
-          element.setAttribute("content", this.metadata.image);
-          break;
+
+      if (name && metadataMap[name]) {
+        element.setAttribute("content", metadataMap[name]);
+      }
+      if (property && metadataMap[property]) {
+        element.setAttribute("content", metadataMap[property]);
+      }
+      if (itemprop && metadataMap[itemprop]) {
+        element.setAttribute("content", metadataMap[itemprop]);
       }
 
-      const type = element.getAttribute("property");
-      switch (type) {
-        case "og:title":
-          console.log('Replacing og:title');
-          element.setAttribute("content", this.metadata.title);
-          break;
-        case "og:description":
-          console.log('Replacing og:description');
-          element.setAttribute("content", this.metadata.description);
-          break;
-        case "og:image":
-          console.log('Replacing og:image');
-          element.setAttribute("content", this.metadata.image);
-          break;
-      }
-
-      // Remove the noindex meta tag
-      const robots = element.getAttribute("name");
-      if (robots === "robots" && element.getAttribute("content") === "noindex") {
+      if (name === "robots" && element.getAttribute("content") === "noindex") {
         console.log('Removing noindex tag');
         element.remove();
       }
