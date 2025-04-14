@@ -30,23 +30,37 @@ export default {
       return pattern.test(url);
     }
 
-    async function requestMetadata(url, metaDataEndpoint) {
-      // Remove any trailing slash from the URL
-      const trimmedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
+    // async function requestMetadata(url, metaDataEndpoint) {
+    //   // Remove any trailing slash from the URL
+    //   const trimmedUrl = url.endsWith('/') ? url.slice(0, -1) : url;
     
-      // Split the trimmed URL by '/' and get the last part: The id
-      const parts = trimmedUrl.split('/');
-      const id = parts[parts.length - 1];
+    //   // Split the trimmed URL by '/' and get the last part: The id
+    //   const parts = trimmedUrl.split('/');
+    //   const id = parts[parts.length - 1];
     
-      // Replace the placeholder in metaDataEndpoint with the actual id
-      const placeholderPattern = /{([^}]+)}/;
-      const metaDataEndpointWithId = metaDataEndpoint.replace(placeholderPattern, id);
+    //   // Replace the placeholder in metaDataEndpoint with the actual id
+    //   const placeholderPattern = /{([^}]+)}/;
+    //   const metaDataEndpointWithId = metaDataEndpoint.replace(placeholderPattern, id);
     
-      // Fetch metadata from the API endpoint
-      const metaDataResponse = await fetch(metaDataEndpointWithId);
-      const metadata = await metaDataResponse.json();
-      return metadata;
-    }
+    //   // Fetch metadata from the API endpoint
+    //   const metaDataResponse = await fetch(metaDataEndpointWithId);
+    //   const metadata = await metaDataResponse.json();
+    //   return metadata;
+    // }
+	  
+	async function requestMetadata(url, metaDataEndpoint, env) {
+	  try {
+	    const trimmedUrl = url.endsWith("/") ? url.slice(0, -1) : url;
+	    const id = trimmedUrl.split("/").pop();
+	    const finalEndpoint = metaDataEndpoint.replace(/{[^}]+}/, id);
+	
+	    const metaDataResponse = await fetch(finalEndpoint, {
+	      headers: {
+	        "apikey": env.SUPABASE_API_KEY,
+	        "Authorization": Bearer ${env.SUPABASE_API_KEY},
+	        "Content-Type": "application/json"
+	      }
+    	});
 
     // Handle dynamic page requests
     const patternConfig = getPatternConfig(url.pathname);
