@@ -4,7 +4,8 @@ const DEFAULT_METADATA = {
   title: "Griiingo",
   description: "Conectamos imigrantes e turistas à comunidade brasileira. Encontre empresas, serviços, eventos e empregos de brasileiros, fora do Brasil.",
   keywords: "empresas brasileiras, serviços brasileiros, eventos brasileiros, empregos brasileiros",
-  image: "https://api.griiingo.com/storage/v1/object/public/public-griiingo-content/general/griiingo-profile.png"
+  image: "https://api.griiingo.com/storage/v1/object/public/public-griiingo-content/general/griiingo-profile.png",
+  type: "LocalBusiness"
 };
 
 function getPatternConfig(pathname) {
@@ -22,7 +23,7 @@ function isPageData(pathname) {
 
 async function requestMetadata(slug, metaDataEndpoint, env) {
   try {
-    const finalEndpoint = `${metaDataEndpoint}?slug=eq.${slug}&select=title,description,keywords,image`;
+    const finalEndpoint = `${metaDataEndpoint}?slug=eq.${slug}&select=title,description,keywords,image,type`;
     const response = await fetch(finalEndpoint, {
       headers: {
         apikey: env.SUPABASE_KEY,
@@ -45,8 +46,10 @@ async function requestMetadata(slug, metaDataEndpoint, env) {
         metadata.image = `https://api.griiingo.com/storage/v1/object/public/public-user-content/companies-photos/${metadata.image}`;
       }
 
-      console.log("[Metadata] Found metadata for slug:", slug, metadata);
-      return metadata;
+      return {
+        ...DEFAULT_METADATA,
+        ...metadata
+      };
     }
 
     console.warn("[Metadata] No result for slug:", slug);
@@ -60,25 +63,28 @@ async function requestMetadata(slug, metaDataEndpoint, env) {
 
 class CustomHeaderHandler {
   constructor(metadata) {
-    this.metadata = metadata;
+    this.metadata = metadata || DEFAULT_METADATA;
   }
 
   element(element) {
+    const meta = this.metadata;
+
     const metadataMap = {
-      "title": this.metadata.title,
-      "description": this.metadata.description,
-      "keywords": this.metadata.keywords,
-      "image": this.metadata.image,
-      "og:title": this.metadata.title,
-      "og:description": this.metadata.description,
-      "og:image": this.metadata.image,
-      "twitter:title": this.metadata.title,
-      "twitter:description": this.metadata.description,
+      "title": meta.title,
+      "description": meta.description,
+      "keywords": meta.keywords,
+      "image": meta.image,
+      "og:title": meta.title,
+      "og:description": meta.description,
+      "og:image": meta.image,
+      "twitter:title": meta.title,
+      "twitter:description": meta.description,
+      "twitter:image": meta.image,
       "twitter:card": "summary_large_image"
     };
 
     if (element.tagName === "title") {
-      element.setInnerContent(this.metadata.title);
+      element.setInnerContent(meta.title);
     }
 
     if (element.tagName === "meta") {
@@ -88,14 +94,43 @@ class CustomHeaderHandler {
 
       if (metadataMap[name]) element.setAttribute("content", metadataMap[name]);
       if (metadataMap[property]) element.setAttribute("content", metadataMap[property]);
-
-      if (itemprop && metadataMap[itemprop]) {
-        element.setAttribute("content", metadataMap[itemprop]);
-      }
+      if (itemprop && metadataMap[itemprop]) element.setAttribute("content", metadataMap[itemprop]);
 
       if (name === "robots") {
         element.setAttribute("content", "index, follow");
       }
+    }
+
+    if (element.tagName === "head") {
+      const structuredData = {
+        "@context": "https://schema.org",
+        "@type": meta.type || "Thing",
+        "name": meta.title,
+        "description": meta.description,
+        "url": "https://www.griiingo.com",
+        "image": meta.image
+      };
+
+      if (meta.type === "LocalBusiness") {
+        structuredData.address = {
+          "@type": "PostalAddress",
+          "addressLocality": "Cidade",
+          "addressRegion": "Estado",
+          "addressCountry": "Brasil"
+        };
+      }
+
+      if (meta.type === "Event") {
+        structuredData.startDate = meta.startDate || "2025-12-01";
+        structuredData.eventStatus = "https://schema.org/EventScheduled";
+        structuredData.eventAttendanceMode = "https://schema.org/OnlineEventAttendanceMode";
+      }
+
+      element.append(`
+        <script type="application/ld+json">
+        ${JSON.stringify(structuredData, null, 2)}
+        </script>
+      `, { html: true });
     }
   }
 }
@@ -112,9 +147,8 @@ export default {
     const isData = isPageData(pathname);
 
     try {
-      // Handle dynamic HTML metadata injection
       if (patternConfig && !isData) {
-        const slug = pathname.split("/").filter(Boolean).pop(); // Extract "tierdigital"
+        const slug = pathname.split("/").filter(Boolean).pop();
         const metadata = await requestMetadata(slug, patternConfig.metaDataEndpoint, env);
 
         const sourceResponse = await fetch(`${config.domainSource}${pathname}`, {
@@ -132,7 +166,6 @@ export default {
           .transform(new Response(sourceResponse.body, { status: sourceResponse.status, headers }));
       }
 
-      // Handle JSON page data (WeWeb)
       if (isData) {
         const referer = request.headers.get("Referer");
         const refPath = referer ? new URL(referer).pathname : null;
@@ -162,7 +195,7 @@ export default {
         }
       }
 
-      // Fallback
+      // fallback
       const fallbackRes = await fetch(`${config.domainSource}${pathname}`, {
         headers: {
           ...Object.fromEntries(request.headers),
