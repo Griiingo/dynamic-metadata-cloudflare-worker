@@ -169,9 +169,6 @@ export default {
     }
 
     const url = new URL(request.url);
-    if (url.hostname === "griiingo.com") {
-	return Response.redirect(`https://www.griiingo.com${url.pathname}`, 301);
-    }
     const pathname = url.pathname;
     const patternConfig = getPatternConfig(pathname);
     const isData = isPageData(pathname);
