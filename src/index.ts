@@ -30,6 +30,20 @@ function inferTypeFromEndpoint(endpoint) {
   return "Thing";
 }
 
+function resolveImagePath(endpoint, image) {
+  if (!image || image.startsWith("http")) return image;
+
+  if (endpoint.includes("companies_metadata") || endpoint.includes("jobs_metadata") || endpoint.includes("benefits_metadata")) {
+    return `https://api.griiingo.com/storage/v1/object/public/public-user-content/companies-photos/${image}`;
+  } else if (endpoint.includes("events_metadata")) {
+    return `https://api.griiingo.com/storage/v1/object/public/public-user-content/events-photos/${image}`;
+  } else if (endpoint.includes("articles_metadata")) {
+    return `https://api.griiingo.com/storage/v1/object/public/public-griiingo-content/general/${image}`;
+  }
+
+  return image;
+}
+
 async function requestMetadata(slug, metaDataEndpoint, env) {
   try {
     const finalEndpoint = `${metaDataEndpoint}?slug=eq.${slug}&select=title,description,keywords,image`;
@@ -50,9 +64,7 @@ async function requestMetadata(slug, metaDataEndpoint, env) {
     const data = await response.json();
     if (Array.isArray(data) && data.length > 0) {
       const metadata = data[0];
-      if (metadata.image && !metadata.image.startsWith("http")) {
-        metadata.image = `https://api.griiingo.com/storage/v1/object/public/public-user-content/companies-photos/${metadata.image}`;
-      }
+      metadata.image = resolveImagePath(metaDataEndpoint, metadata.image);
       return {
         ...DEFAULT_METADATA,
         ...metadata,
