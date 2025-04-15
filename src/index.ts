@@ -7,7 +7,6 @@ const DEFAULT_METADATA = {
   image: "https://api.griiingo.com/storage/v1/object/public/public-griiingo-content/general/griiingo-profile.png"
 };
 
-// Utilities
 function getPatternConfig(url) {
   for (const patternConfig of config.patterns) {
     const regex = new RegExp(patternConfig.pattern);
@@ -42,27 +41,24 @@ async function requestMetadata(url, metaDataEndpoint, env) {
     }
 
     const responseJson = await metaDataResponse.json();
+    const metadata = responseJson?.source?.["0"];
 
-    if (responseJson && responseJson.source && responseJson.source["0"]) {
-      const metadata = responseJson.source["0"];
-
-      // If image is only UUID, build full URL
-      if (metadata.image && !metadata.image.startsWith('http')) {
+    if (metadata && metadata.title) {
+      if (metadata.image && !metadata.image.startsWith("http")) {
         metadata.image = `https://api.griiingo.com/storage/v1/object/public/public-user-content/companies-photos/${metadata.image}`;
       }
-
+      console.log("[Metadata] Final metadata used:", metadata);
       return metadata;
-    } else {
-      console.warn("[Metadata] Empty or invalid response", responseJson);
-      return DEFAULT_METADATA;
     }
+
+    console.warn("[Metadata] Empty or invalid response", responseJson);
+    return DEFAULT_METADATA;
   } catch (e) {
     console.error("[Metadata] Fetch error:", e);
     return DEFAULT_METADATA;
   }
 }
 
-// Rewriter
 class CustomHeaderHandler {
   constructor(metadata) {
     this.metadata = metadata || DEFAULT_METADATA;
@@ -83,6 +79,7 @@ class CustomHeaderHandler {
     };
 
     if (element.tagName === "title") {
+      console.log("[Rewriter] Updating <title>");
       element.setInnerContent(this.metadata.title);
     }
 
@@ -91,19 +88,23 @@ class CustomHeaderHandler {
       const property = element.getAttribute("property");
       const itemprop = element.getAttribute("itemprop");
 
-      if (metadataMap[name]) element.setAttribute("content", metadataMap[name]);
-      if (metadataMap[property]) element.setAttribute("content", metadataMap[property]);
+      if (metadataMap[name]) {
+        console.log(`[Rewriter] Updating <meta name="${name}">`);
+        element.setAttribute("content", metadataMap[name]);
+      }
+
+      if (metadataMap[property]) {
+        console.log(`[Rewriter] Updating <meta property="${property}">`);
+        element.setAttribute("content", metadataMap[property]);
+      }
 
       if (itemprop) {
         switch (itemprop) {
           case "name":
-            element.setAttribute("content", this.metadata.title);
-            break;
           case "description":
-            element.setAttribute("content", this.metadata.description);
-            break;
           case "image":
-            element.setAttribute("content", this.metadata.image);
+            console.log(`[Rewriter] Updating <meta itemprop="${itemprop}">`);
+            element.setAttribute("content", metadataMap[itemprop]);
             break;
         }
       }
@@ -117,7 +118,6 @@ class CustomHeaderHandler {
 
 export default {
   async fetch(request, env, ctx) {
-    // ⚠️ Avoid infinite loop
     if (request.headers.get("X-Bypass-Worker") === "true") {
       return fetch(request);
     }
@@ -127,9 +127,10 @@ export default {
       const patternConfig = getPatternConfig(url.pathname);
       const isData = isPageData(url.pathname);
 
-      // Dynamic page metadata case
       if (patternConfig && !isData) {
         const metadata = await requestMetadata(url.pathname, patternConfig.metaDataEndpoint, env);
+        console.log("[Worker] Injecting metadata into HTMLRewriter for:", url.pathname);
+
         const source = await fetch(`${config.domainSource}${url.pathname}`, {
           headers: {
             ...Object.fromEntries(request.headers),
@@ -145,11 +146,11 @@ export default {
           .transform(new Response(source.body, { status: source.status, headers }));
       }
 
-      // Page data JSON case
       if (isData) {
         const referer = request.headers.get("Referer");
         const pathname = referer?.endsWith("/") ? referer : referer + "/";
         const patternConfigForPageData = getPatternConfig(pathname);
+
         if (patternConfigForPageData) {
           const metadata = await requestMetadata(pathname, patternConfigForPageData.metaDataEndpoint, env);
           const sourceResponse = await fetch(`${config.domainSource}${url.pathname}`, {
@@ -174,7 +175,7 @@ export default {
         }
       }
 
-      // Fallback: Static/default pages (apply DEFAULT_METADATA)
+      // Fallback case
       const fallbackRes = await fetch(`${config.domainSource}${url.pathname}`, {
         headers: {
           ...Object.fromEntries(request.headers),
@@ -188,6 +189,7 @@ export default {
       return new HTMLRewriter()
         .on("*", new CustomHeaderHandler(DEFAULT_METADATA))
         .transform(new Response(fallbackRes.body, { status: fallbackRes.status, headers }));
+
     } catch (err) {
       console.error("[Worker] Global error:", err);
       const fallback = new Response("Default content", { status: 200, headers: { "Content-Type": "text/html" } });
