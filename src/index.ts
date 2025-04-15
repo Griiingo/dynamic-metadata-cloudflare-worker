@@ -93,13 +93,11 @@ class CustomHeaderHandler {
       description: meta.description,
       keywords: meta.keywords,
       image: meta.image,
-			
       "og:title": meta.title,
       "og:description": meta.description,
       "og:site_name": meta.title,
       "og:type": meta.type,
       "og:image": meta.image,
-			
       "twitter:title": meta.title,
       "twitter:description": meta.description,
       "twitter:image": meta.image,
@@ -115,7 +113,7 @@ class CustomHeaderHandler {
       const property = element.getAttribute("property") || "";
       const itemprop = element.getAttribute("itemprop") || "";
 
-      if (metadataMap[name]) element.setAttribute("content", metadataMap[title]);
+      if (metadataMap[name]) element.setAttribute("content", metadataMap[name]);
       if (metadataMap[property]) element.setAttribute("content", metadataMap[property]);
       if (metadataMap[itemprop]) element.setAttribute("content", metadataMap[itemprop]);
 
