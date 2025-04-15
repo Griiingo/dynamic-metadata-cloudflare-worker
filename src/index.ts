@@ -7,61 +7,60 @@ const DEFAULT_METADATA = {
   image: "https://api.griiingo.com/storage/v1/object/public/public-griiingo-content/general/griiingo-profile.png"
 };
 
-function getPatternConfig(url) {
+function getPatternConfig(pathname) {
   for (const patternConfig of config.patterns) {
     const regex = new RegExp(patternConfig.pattern);
-    let pathname = url + (url.endsWith("/") ? "" : "/");
     if (regex.test(pathname)) return patternConfig;
   }
   return null;
 }
 
-function isPageData(url) {
+function isPageData(pathname) {
   const pattern = /\/public\/data\/[a-f0-9-]{36}\.json/;
-  return pattern.test(url);
+  return pattern.test(pathname);
 }
 
-async function requestMetadata(url, metaDataEndpoint, env) {
+async function requestMetadata(slug, metaDataEndpoint, env) {
   try {
-    const trimmedUrl = url.endsWith("/") ? url.slice(0, -1) : url;
-    const id = trimmedUrl.split("/").pop();
-    const finalEndpoint = metaDataEndpoint.replace(/{[^}]+}/, id);
-
-    const metaDataResponse = await fetch(finalEndpoint, {
+    const finalEndpoint = `${metaDataEndpoint}?slug=eq.${slug}&select=title,description,keywords,image`;
+    const response = await fetch(finalEndpoint, {
       headers: {
-        "apikey": env.SUPABASE_KEY,
-        "Authorization": `Bearer ${env.SUPABASE_KEY}`,
+        apikey: env.SUPABASE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_KEY}`,
         "Content-Type": "application/json"
       }
     });
 
-    if (!metaDataResponse.ok) {
-      console.error(`[Metadata] Failed with status ${metaDataResponse.status}`);
+    if (!response.ok) {
+      console.error(`[Metadata] Failed with status ${response.status}`);
       return DEFAULT_METADATA;
     }
 
-    const responseJson = await metaDataResponse.json();
-    const metadata = responseJson?.source?.["0"];
+    const data = await response.json();
 
-    if (metadata && metadata.title) {
+    if (Array.isArray(data) && data.length > 0) {
+      const metadata = data[0];
+
       if (metadata.image && !metadata.image.startsWith("http")) {
         metadata.image = `https://api.griiingo.com/storage/v1/object/public/public-user-content/companies-photos/${metadata.image}`;
       }
-      console.log("[Metadata] Final metadata used:", metadata);
+
+      console.log("[Metadata] Found metadata for slug:", slug, metadata);
       return metadata;
     }
 
-    console.warn("[Metadata] Empty or invalid response", responseJson);
+    console.warn("[Metadata] No result for slug:", slug);
     return DEFAULT_METADATA;
-  } catch (e) {
-    console.error("[Metadata] Fetch error:", e);
+
+  } catch (err) {
+    console.error("[Metadata] Fetch error:", err);
     return DEFAULT_METADATA;
   }
 }
 
 class CustomHeaderHandler {
   constructor(metadata) {
-    this.metadata = metadata || DEFAULT_METADATA;
+    this.metadata = metadata;
   }
 
   element(element) {
@@ -79,7 +78,6 @@ class CustomHeaderHandler {
     };
 
     if (element.tagName === "title") {
-      console.log("[Rewriter] Updating <title>");
       element.setInnerContent(this.metadata.title);
     }
 
@@ -88,25 +86,11 @@ class CustomHeaderHandler {
       const property = element.getAttribute("property");
       const itemprop = element.getAttribute("itemprop");
 
-      if (metadataMap[name]) {
-        console.log(`[Rewriter] Updating <meta name="${name}">`);
-        element.setAttribute("content", metadataMap[name]);
-      }
+      if (metadataMap[name]) element.setAttribute("content", metadataMap[name]);
+      if (metadataMap[property]) element.setAttribute("content", metadataMap[property]);
 
-      if (metadataMap[property]) {
-        console.log(`[Rewriter] Updating <meta property="${property}">`);
-        element.setAttribute("content", metadataMap[property]);
-      }
-
-      if (itemprop) {
-        switch (itemprop) {
-          case "name":
-          case "description":
-          case "image":
-            console.log(`[Rewriter] Updating <meta itemprop="${itemprop}">`);
-            element.setAttribute("content", metadataMap[itemprop]);
-            break;
-        }
+      if (itemprop && metadataMap[itemprop]) {
+        element.setAttribute("content", metadataMap[itemprop]);
       }
 
       if (name === "robots") {
@@ -122,43 +106,46 @@ export default {
       return fetch(request);
     }
 
+    const url = new URL(request.url);
+    const pathname = url.pathname;
+    const patternConfig = getPatternConfig(pathname);
+    const isData = isPageData(pathname);
+
     try {
-      const url = new URL(request.url);
-      const patternConfig = getPatternConfig(url.pathname);
-      const isData = isPageData(url.pathname);
-
+      // Handle dynamic HTML metadata injection
       if (patternConfig && !isData) {
-        const metadata = await requestMetadata(url.pathname, patternConfig.metaDataEndpoint, env);
-        console.log("[Worker] Injecting metadata into HTMLRewriter for:", url.pathname);
+        const slug = pathname.split("/").filter(Boolean).pop(); // Extract "tierdigital"
+        const metadata = await requestMetadata(slug, patternConfig.metaDataEndpoint, env);
 
-        const source = await fetch(`${config.domainSource}${url.pathname}`, {
+        const sourceResponse = await fetch(`${config.domainSource}${pathname}`, {
           headers: {
             ...Object.fromEntries(request.headers),
             "X-Bypass-Worker": "true"
           }
         });
 
-        const headers = new Headers(source.headers);
+        const headers = new Headers(sourceResponse.headers);
         headers.delete("X-Robots-Tag");
 
         return new HTMLRewriter()
           .on("*", new CustomHeaderHandler(metadata))
-          .transform(new Response(source.body, { status: source.status, headers }));
+          .transform(new Response(sourceResponse.body, { status: sourceResponse.status, headers }));
       }
 
+      // Handle JSON page data (WeWeb)
       if (isData) {
         const referer = request.headers.get("Referer");
-        const pathname = referer?.endsWith("/") ? referer : referer + "/";
-        const patternConfigForPageData = getPatternConfig(pathname);
+        const refPath = referer ? new URL(referer).pathname : null;
+        const patternConfig = getPatternConfig(refPath);
 
-        if (patternConfigForPageData) {
-          const metadata = await requestMetadata(pathname, patternConfigForPageData.metaDataEndpoint, env);
-          const sourceResponse = await fetch(`${config.domainSource}${url.pathname}`, {
+        if (patternConfig) {
+          const slug = refPath.split("/").filter(Boolean).pop();
+          const metadata = await requestMetadata(slug, patternConfig.metaDataEndpoint, env);
+          const sourceResponse = await fetch(`${config.domainSource}${pathname}`, {
             headers: { "X-Bypass-Worker": "true" }
           });
 
           const json = await sourceResponse.json();
-
           json.page = json.page || {};
           json.page.title = { en: metadata.title };
           json.page.meta = {
@@ -175,8 +162,8 @@ export default {
         }
       }
 
-      // Fallback case
-      const fallbackRes = await fetch(`${config.domainSource}${url.pathname}`, {
+      // Fallback
+      const fallbackRes = await fetch(`${config.domainSource}${pathname}`, {
         headers: {
           ...Object.fromEntries(request.headers),
           "X-Bypass-Worker": "true"
