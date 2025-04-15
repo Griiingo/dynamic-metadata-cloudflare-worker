@@ -105,7 +105,7 @@ class CustomHeaderHandler {
     };
 
     if (element.tagName === "title") {
-      element.setInnerContent(meta.title);
+      element.setInnerContent(this.metadata.title);
     }
 
     if (element.tagName === "meta") {
