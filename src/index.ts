@@ -144,7 +144,7 @@ class CustomHeaderHandler {
           "addressLocality": "Cidade",
           "addressRegion": "Estado",
           "addressCountry": "Estados Unidos"
-        };
+        },
 	structuredData.telephone = "",
 	structuredData.priceRange = "";
       }
