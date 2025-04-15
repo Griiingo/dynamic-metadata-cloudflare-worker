@@ -39,8 +39,7 @@ async function requestMetadata(slug, metaDataEndpoint, env) {
         apikey: env.SUPABASE_KEY,
         Authorization: `Bearer ${env.SUPABASE_KEY}`,
         "Content-Type": "application/json"
-      },
-      cache: "no-store"
+      }
     });
 
     if (!response.ok) {
@@ -171,8 +170,7 @@ export default {
               ].includes(key.toLowerCase()))
             ),
             "X-Bypass-Worker": "true"
-          },
-          cache: "no-store"
+          }
         });
 
         const headers = new Headers(sourceResponse.headers);
@@ -195,8 +193,7 @@ export default {
             method: "GET",
             headers: {
               "X-Bypass-Worker": "true"
-            },
-            cache: "no-store"
+            }
           });
 
           const json = await sourceResponse.json();
@@ -227,8 +224,7 @@ export default {
             ].includes(key.toLowerCase()))
           ),
           "X-Bypass-Worker": "true"
-        },
-        cache: "no-store"
+        }
       });
 
       const headers = new Headers(fallbackRes.headers);
