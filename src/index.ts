@@ -23,7 +23,7 @@ function isPageData(pathname) {
 
 async function requestMetadata(slug, metaDataEndpoint, env) {
   try {
-    const finalEndpoint = `${metaDataEndpoint}?slug=eq.${slug}&select=title,description,keywords,image,type`;
+    const finalEndpoint = `${metaDataEndpoint}?slug=eq.${slug}&select=title,description,keywords,image`;
     const response = await fetch(finalEndpoint, {
       headers: {
         apikey: env.SUPABASE_KEY,
@@ -34,31 +34,39 @@ async function requestMetadata(slug, metaDataEndpoint, env) {
 
     if (!response.ok) {
       console.error(`[Metadata] Failed with status ${response.status}`);
-      return DEFAULT_METADATA;
+      return { ...DEFAULT_METADATA, type: inferTypeFromEndpoint(metaDataEndpoint) };
     }
 
     const data = await response.json();
 
     if (Array.isArray(data) && data.length > 0) {
       const metadata = data[0];
-
       if (metadata.image && !metadata.image.startsWith("http")) {
         metadata.image = `https://api.griiingo.com/storage/v1/object/public/public-user-content/companies-photos/${metadata.image}`;
       }
-
       return {
         ...DEFAULT_METADATA,
-        ...metadata
+        ...metadata,
+        type: inferTypeFromEndpoint(metaDataEndpoint)
       };
     }
 
     console.warn("[Metadata] No result for slug:", slug);
-    return DEFAULT_METADATA;
+    return { ...DEFAULT_METADATA, type: inferTypeFromEndpoint(metaDataEndpoint) };
 
   } catch (err) {
     console.error("[Metadata] Fetch error:", err);
-    return DEFAULT_METADATA;
+    return { ...DEFAULT_METADATA, type: inferTypeFromEndpoint(metaDataEndpoint) };
   }
+}
+
+function inferTypeFromEndpoint(endpoint) {
+  if (endpoint.includes("companies_metadata")) return "LocalBusiness";
+  if (endpoint.includes("services_metadata")) return "Service";
+  if (endpoint.includes("events_metadata")) return "Event";
+  if (endpoint.includes("jobs_metadata")) return "JobPosting";
+  if (endpoint.includes("benefits_metadata")) return "Offer";
+  return "Thing";
 }
 
 class CustomHeaderHandler {
