@@ -97,7 +97,7 @@ class CustomHeaderHandler {
       "og:title": meta.title,
       "og:description": meta.description,
       "og:site_name": meta.title,
-      "og:type": inferTypeFromEndpoint(metaDataEndpoint),
+      "og:type": return inferTypeFromEndpoint(metaDataEndpoint),
       "og:image": meta.image,
 			
       "twitter:title": meta.title,
