@@ -4,7 +4,7 @@ export const config = {
 	patterns: [
 	      {
 	          pattern: "/empresa/[^/]+",
-	          metaDataEndpoint: "https://api.griiingo.com/rest/v1/companies_metadata?slug=eq.{slug}&select=title,description,image,keywords"
+	          metaDataEndpoint: "https://api.griiingo.com/rest/v1/companies_metadata?slug=eq.{slug}"
 	      },
 	      {
 	          pattern: "/evento/[^/]+",
