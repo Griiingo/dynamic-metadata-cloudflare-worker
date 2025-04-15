@@ -109,7 +109,7 @@ class CustomHeaderHandler {
     }
 
     if (element.tagName === "meta") {
-			const name = element.getAttribute("name") || "";
+	const name = element.getAttribute("name") || "";
       const property = element.getAttribute("property") || "";
       const itemprop = element.getAttribute("itemprop") || "";
 
@@ -143,8 +143,10 @@ class CustomHeaderHandler {
           "@type": "PostalAddress",
           "addressLocality": "Cidade",
           "addressRegion": "Estado",
-          "addressCountry": "Brasil"
+          "addressCountry": "Estados Unidos"
         };
+	structuredData.telephone = "",
+	structuredData.priceRange = "";
       }
 
       if (meta.type === "Event") {
