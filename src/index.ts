@@ -27,7 +27,7 @@ function inferTypeFromEndpoint(endpoint) {
   if (endpoint.includes("events_metadata")) return "Event";
   if (endpoint.includes("jobs_metadata")) return "JobPosting";
   if (endpoint.includes("benefits_metadata")) return "Offer";
-  return "Thing";
+  return "Content";
 }
 
 function resolveImagePath(endpoint, image) {
@@ -97,7 +97,7 @@ class CustomHeaderHandler {
       "og:title": meta.title,
       "og:description": meta.description,
       "og:site_name": meta.title,
-      "og:type": return inferTypeFromEndpoint(metaDataEndpoint),
+      "og:type": meta.type,
       "og:image": meta.image,
 			
       "twitter:title": meta.title,
@@ -127,7 +127,7 @@ class CustomHeaderHandler {
     if (element.tagName === "head") {
       const structuredData = {
         "@context": "https://schema.org",
-        "@type": meta.type || "Thing",
+        "@type": meta.type || "Content",
         "name": meta.title,
         "description": meta.description,
         "url": "https://www.griiingo.com",
