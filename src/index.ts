@@ -21,6 +21,15 @@ function isPageData(pathname) {
   return pattern.test(pathname);
 }
 
+function inferTypeFromEndpoint(endpoint) {
+  if (endpoint.includes("companies_metadata")) return "LocalBusiness";
+  if (endpoint.includes("services_metadata")) return "Service";
+  if (endpoint.includes("events_metadata")) return "Event";
+  if (endpoint.includes("jobs_metadata")) return "JobPosting";
+  if (endpoint.includes("benefits_metadata")) return "Offer";
+  return "Thing";
+}
+
 async function requestMetadata(slug, metaDataEndpoint, env) {
   try {
     const finalEndpoint = `${metaDataEndpoint}?slug=eq.${slug}&select=title,description,keywords,image`;
@@ -38,7 +47,6 @@ async function requestMetadata(slug, metaDataEndpoint, env) {
     }
 
     const data = await response.json();
-
     if (Array.isArray(data) && data.length > 0) {
       const metadata = data[0];
       if (metadata.image && !metadata.image.startsWith("http")) {
@@ -53,35 +61,25 @@ async function requestMetadata(slug, metaDataEndpoint, env) {
 
     console.warn("[Metadata] No result for slug:", slug);
     return { ...DEFAULT_METADATA, type: inferTypeFromEndpoint(metaDataEndpoint) };
-
   } catch (err) {
     console.error("[Metadata] Fetch error:", err);
     return { ...DEFAULT_METADATA, type: inferTypeFromEndpoint(metaDataEndpoint) };
   }
 }
 
-function inferTypeFromEndpoint(endpoint) {
-  if (endpoint.includes("companies_metadata")) return "LocalBusiness";
-  if (endpoint.includes("services_metadata")) return "Service";
-  if (endpoint.includes("events_metadata")) return "Event";
-  if (endpoint.includes("jobs_metadata")) return "JobPosting";
-  if (endpoint.includes("benefits_metadata")) return "Offer";
-  return "Thing";
-}
-
 class CustomHeaderHandler {
   constructor(metadata) {
-    this.metadata = metadata || DEFAULT_METADATA;
+    this.metadata = { ...DEFAULT_METADATA, ...metadata };
   }
 
   element(element) {
     const meta = this.metadata;
 
     const metadataMap = {
-      "title": meta.title,
-      "description": meta.description,
-      "keywords": meta.keywords,
-      "image": meta.image,
+      title: meta.title,
+      description: meta.description,
+      keywords: meta.keywords,
+      image: meta.image,
       "og:title": meta.title,
       "og:description": meta.description,
       "og:image": meta.image,
@@ -96,13 +94,13 @@ class CustomHeaderHandler {
     }
 
     if (element.tagName === "meta") {
-      const name = element.getAttribute("name");
-      const property = element.getAttribute("property");
-      const itemprop = element.getAttribute("itemprop");
+      const name = element.getAttribute("name") || "";
+      const property = element.getAttribute("property") || "";
+      const itemprop = element.getAttribute("itemprop") || "";
 
       if (metadataMap[name]) element.setAttribute("content", metadataMap[name]);
       if (metadataMap[property]) element.setAttribute("content", metadataMap[property]);
-      if (itemprop && metadataMap[itemprop]) element.setAttribute("content", metadataMap[itemprop]);
+      if (metadataMap[itemprop]) element.setAttribute("content", metadataMap[itemprop]);
 
       if (name === "robots") {
         element.setAttribute("content", "index, follow");
@@ -203,7 +201,6 @@ export default {
         }
       }
 
-      // fallback
       const fallbackRes = await fetch(`${config.domainSource}${pathname}`, {
         headers: {
           ...Object.fromEntries(request.headers),
