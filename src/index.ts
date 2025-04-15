@@ -109,13 +109,19 @@ class CustomHeaderHandler {
     }
 
     if (element.tagName === "meta") {
-      const name = element.getAttribute("name") || "";
+			const name = element.getAttribute("name") || "";
       const property = element.getAttribute("property") || "";
       const itemprop = element.getAttribute("itemprop") || "";
 
       if (metadataMap[name]) element.setAttribute("content", metadataMap[name]);
       if (metadataMap[property]) element.setAttribute("content", metadataMap[property]);
-      if (metadataMap[itemprop]) element.setAttribute("content", metadataMap[itemprop]);
+      if (itemprop === "name") {
+        element.setAttribute("content", meta.title);
+      } else if (itemprop === "description") {
+        element.setAttribute("content", meta.description);
+      } else if (itemprop === "image") {
+        element.setAttribute("content", meta.image);
+      }
 
       if (name === "robots") {
         element.setAttribute("content", "index, follow");
