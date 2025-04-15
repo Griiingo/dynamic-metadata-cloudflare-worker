@@ -134,7 +134,7 @@ class CustomHeaderHandler {
         "@type": meta.type || "Content",
         "name": meta.title,
         "description": meta.description,
-        "url":  url.href,
+        "url": this.url?.href || "https://www.griiingo.com",
         "image": meta.image
       };
 
