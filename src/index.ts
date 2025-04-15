@@ -33,12 +33,14 @@ function inferTypeFromEndpoint(endpoint) {
 async function requestMetadata(slug, metaDataEndpoint, env) {
   try {
     const finalEndpoint = `${metaDataEndpoint}?slug=eq.${slug}&select=title,description,keywords,image`;
+    console.log(`[Worker] Fetching metadata for slug "${slug}" via endpoint ${finalEndpoint}`);
     const response = await fetch(finalEndpoint, {
       headers: {
         apikey: env.SUPABASE_KEY,
         Authorization: `Bearer ${env.SUPABASE_KEY}`,
         "Content-Type": "application/json"
-      }
+      },
+      cache: "no-store"
     });
 
     if (!response.ok) {
@@ -156,12 +158,21 @@ export default {
       if (patternConfig && !isData) {
         const slug = pathname.split("/").filter(Boolean).pop();
         const metadata = await requestMetadata(slug, patternConfig.metaDataEndpoint, env);
+        console.log("[Worker] Metadata used:", metadata);
 
         const sourceResponse = await fetch(`${config.domainSource}${pathname}`, {
+          method: "GET",
           headers: {
-            ...Object.fromEntries(request.headers),
+            ...Object.fromEntries(
+              [...request.headers].filter(([key]) => ![
+                "if-modified-since",
+                "if-none-match",
+                "x-forwarded-proto"
+              ].includes(key.toLowerCase()))
+            ),
             "X-Bypass-Worker": "true"
-          }
+          },
+          cache: "no-store"
         });
 
         const headers = new Headers(sourceResponse.headers);
@@ -181,7 +192,11 @@ export default {
           const slug = refPath.split("/").filter(Boolean).pop();
           const metadata = await requestMetadata(slug, patternConfig.metaDataEndpoint, env);
           const sourceResponse = await fetch(`${config.domainSource}${pathname}`, {
-            headers: { "X-Bypass-Worker": "true" }
+            method: "GET",
+            headers: {
+              "X-Bypass-Worker": "true"
+            },
+            cache: "no-store"
           });
 
           const json = await sourceResponse.json();
@@ -202,10 +217,18 @@ export default {
       }
 
       const fallbackRes = await fetch(`${config.domainSource}${pathname}`, {
+        method: "GET",
         headers: {
-          ...Object.fromEntries(request.headers),
+          ...Object.fromEntries(
+            [...request.headers].filter(([key]) => ![
+              "if-modified-since",
+              "if-none-match",
+              "x-forwarded-proto"
+            ].includes(key.toLowerCase()))
+          ),
           "X-Bypass-Worker": "true"
-        }
+        },
+        cache: "no-store"
       });
 
       const headers = new Headers(fallbackRes.headers);
